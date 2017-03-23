@@ -4,6 +4,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.StaticHandler;
 
 public class MyFirstVerticle extends AbstractVerticle {
     @Override
@@ -18,6 +19,9 @@ public class MyFirstVerticle extends AbstractVerticle {
                     .putHeader("content-type", "text/html")
                     .end("<h1>Hello from my first Vert.x 3 application (*2)</h1>");
         });
+
+        // Serve static resources from the /assets directory
+        router.route("/assets/*").handler(StaticHandler.create("assets"));
 
         vertx
                 .createHttpServer()
