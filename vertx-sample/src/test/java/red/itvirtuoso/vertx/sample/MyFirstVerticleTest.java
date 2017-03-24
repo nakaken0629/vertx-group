@@ -21,15 +21,11 @@ public class MyFirstVerticleTest {
     private int port;
 
     @Before
-    public void setUp(TestContext context) {
+    public void setUp(TestContext context) throws IOException {
         vertx = Vertx.vertx();
-        try {
-            ServerSocket socket = new ServerSocket(0);
-            port = socket.getLocalPort();
-            socket.close();
-        } catch (IOException e) {
-            port = 8080;
-        }
+        ServerSocket socket = new ServerSocket(0);
+        port = socket.getLocalPort();
+        socket.close();
         DeploymentOptions options = new DeploymentOptions()
                 .setConfig(new JsonObject().put("http.port", port));
         vertx.deployVerticle(MyFirstVerticle.class.getName(),
@@ -43,15 +39,15 @@ public class MyFirstVerticleTest {
     }
 
     @Test
-    public void testMyApplication(TestContext context) {
-        final Async async = context.async();
-
-        vertx.createHttpClient().getNow(port, "localhost", "/",
-                response -> {
-                    response.handler(body -> {
-                        context.assertTrue(body.toString().contains("Hello"));
-                        async.complete();
-                    });
-                });
+    public void checkThatTheIndexPageIsServed(TestContext context) {
+        Async async = context.async();
+        vertx.createHttpClient().getNow(port, "localhost", "/assets/index.html", response -> {
+            context.assertEquals(200, response.statusCode());
+            context.assertEquals(response.headers().get("content-type"), "text/html;charset=UTF-8");
+            response.bodyHandler(body -> {
+                context.assertTrue(body.toString().contains("<title>My Whisky Collection</title>"));
+                async.complete();;
+            });
+        });
     }
 }
