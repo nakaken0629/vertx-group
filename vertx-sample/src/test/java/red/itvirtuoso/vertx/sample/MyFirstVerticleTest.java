@@ -16,63 +16,54 @@ import red.itvirtuoso.vertx.sample.first.Whisky;
 import java.io.IOException;
 import java.net.ServerSocket;
 
+import static com.jayway.restassured.RestAssured.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.hamcrest.Matchers.*;
+
 @RunWith(VertxUnitRunner.class)
 public class MyFirstVerticleTest {
 
-    private Vertx vertx;
-    private int port;
-
-    @Before
-    public void setUp(TestContext context) throws IOException {
-        vertx = Vertx.vertx();
-        ServerSocket socket = new ServerSocket(0);
-        port = socket.getLocalPort();
-        socket.close();
-        DeploymentOptions options = new DeploymentOptions()
-                .setConfig(new JsonObject().put("http.port", port));
-        vertx.deployVerticle(MyFirstVerticle.class.getName(),
-                options,
-                context.asyncAssertSuccess());
-    }
-
-    @After
-    public void tearDown(TestContext context) {
-        vertx.close(context.asyncAssertSuccess());
+    @Test
+    public void checkThatWeCanRetrieveIndividualProduct() {
+        // Get the list of bottles, ensure it's a success and extract the first id.
+        final int id = get("/api/whiskies").then()
+                .assertThat()
+                .statusCode(200)
+                .extract()
+                .jsonPath().getInt("find { it.name=='Bowmore 15 Years Laimrig' }.id");
+        // Now get the individual resource and check the content
+        get("/api/whiskies/" + id).then()
+                .assertThat()
+                .statusCode(200)
+                .body("name", equalTo("Bowmore 15 Years Laimrig"))
+                .body("origin", equalTo("Scotland, Islay"))
+                .body("id", equalTo(id));
     }
 
     @Test
-    public void checkThatTheIndexPageIsServed(TestContext context) {
-        Async async = context.async();
-        vertx.createHttpClient().getNow(port, "localhost", "/assets/index.html", response -> {
-            context.assertEquals(200, response.statusCode());
-            context.assertEquals(response.headers().get("content-type"), "text/html;charset=UTF-8");
-            response.bodyHandler(body -> {
-                context.assertTrue(body.toString().contains("<title>My Whisky Collection</title>"));
-                async.complete();;
-            });
-        });
-    }
-
-    @Test
-    public void checkThatWeCanAdd(TestContext context) {
-        Async async = context.async();
-        final String json = Json.encodePrettily(new Whisky("Jameon", "Ireland"));
-        final String length = Integer.toString(json.length());
-        vertx.createHttpClient().post(port, "localhost", "/api/whiskies")
-                .putHeader("content-type", "application/json")
-                .putHeader("content-length", length)
-                .handler(response -> {
-                    context.assertEquals(201, response.statusCode());
-                    context.assertTrue(response.headers().get("content-type").contains("application/json"));
-                    response.bodyHandler(body -> {
-                        final Whisky whisky = Json.decodeValue(body.toString(), Whisky.class);
-                        context.assertEquals("Jameon", whisky.getName());
-                        context.assertEquals("Ireland", whisky.getOrigin());
-                        context.assertNotNull(whisky.getId());
-                        async.complete();
-                    });
-                })
-                .write(json)
-                .end();
+    public void checkWeCanAddAndDeleteAProduct() {
+        // Create a new bottle and retrieve the result (as a Whisky instance).
+        Whisky whisky = given()
+                .body("{\"name\":\"Jameson\", \"origin\":\"Ireland\"}")
+                .request().post("/api/whiskies")
+                .thenReturn()
+                .as(Whisky.class);
+        assertThat(whisky.getName()).isEqualToIgnoringCase("Jameson");
+        assertThat(whisky.getOrigin()).isEqualToIgnoringCase("Ireland");
+        assertThat(whisky.getId()).isNotZero();
+        // Check that it has created an individual resource, and check the content.
+        get("/api/whiskies/" + whisky.getId()).then()
+                .assertThat()
+                .statusCode(200)
+                .body("name", equalTo("Jameson"))
+                .body("origin", equalTo("Ireland"))
+                .body("id", equalTo(whisky.getId()));
+        // Delete the bottle
+        delete("/api/whiskies/" + whisky.getId()).then().assertThat().statusCode(204);
+        // Check that the resource is not available anymore
+        get("/api/whiskies/" + whisky.getId())
+                .then()
+                .assertThat()
+                .statusCode(404);
     }
 }

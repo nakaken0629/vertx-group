@@ -20,6 +20,8 @@ dependencies {
     compile "io.vertx:vertx-web:$version"
     testCompile "junit:junit:4.11"
     testCompile "io.vertx:vertx-unit:$version"
+    testCompile "com.jayway.restassured:rest-assured:2.4.0"
+    testCompile "org.assertj:assertj-core:2.0.0"
 }
 
 shadowJar {
@@ -40,10 +42,7 @@ test.dependsOn.add(shadowJar)
 test.doFirst {
     ant.java(jar: "build/libs/${project.name}-${version}-fat.jar",
             fork: true,
-            spawn: true) {
-        arg(value: '-conf')
-        arg(value: "build/resources/test/my-it-config.json")
-    }
+            spawn: true)
 }
 test.doLast {
     ['sh', '-c', "ps -ax | grep ${project.name}-${version}-fat.jar | grep -v grep | awk 'NR==1{print \$1}' | xargs kill -SIGTERM"].execute()
