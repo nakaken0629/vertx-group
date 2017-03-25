@@ -2,6 +2,7 @@ package red.itvirtuoso.vertx.sample;
 
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
@@ -10,6 +11,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import red.itvirtuoso.vertx.sample.first.Whisky;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -49,5 +51,28 @@ public class MyFirstVerticleTest {
                 async.complete();;
             });
         });
+    }
+
+    @Test
+    public void checkThatWeCanAdd(TestContext context) {
+        Async async = context.async();
+        final String json = Json.encodePrettily(new Whisky("Jameon", "Ireland"));
+        final String length = Integer.toString(json.length());
+        vertx.createHttpClient().post(port, "localhost", "/api/whiskies")
+                .putHeader("content-type", "application/json")
+                .putHeader("content-length", length)
+                .handler(response -> {
+                    context.assertEquals(201, response.statusCode());
+                    context.assertTrue(response.headers().get("content-type").contains("application/json"));
+                    response.bodyHandler(body -> {
+                        final Whisky whisky = Json.decodeValue(body.toString(), Whisky.class);
+                        context.assertEquals("Jameon", whisky.getName());
+                        context.assertEquals("Ireland", whisky.getOrigin());
+                        context.assertNotNull(whisky.getId());
+                        async.complete();
+                    });
+                })
+                .write(json)
+                .end();
     }
 }
